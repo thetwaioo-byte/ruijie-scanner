@@ -1,9 +1,14 @@
 name: Ruijie Scanner Bot
 
 on:
+  repository_dispatch:
+    types: [start_scanner]
   workflow_dispatch:
-  schedule:
-    - cron: '0 */5 * * *' # တစ်နေ့ကို ၅ နာရီတစ်ကြိမ် အလိုအလျောက် ပြန်လည်စတင်ရန်
+    inputs:
+      portal_url:
+        description: 'Ruijie Portal URL'
+        required: true
+        default: 'http://example.com/portal'
 
 jobs:
   build:
@@ -24,5 +29,7 @@ jobs:
         pip install requests
 
     - name: Run scanner script
+      env:
+        PORTAL_URL: ${{ github.event.client_payload.portal_url || github.event.inputs.portal_url }}
       run: python scanner.py
       
