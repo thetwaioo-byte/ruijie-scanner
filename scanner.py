@@ -3,7 +3,6 @@ import random
 import requests
 import os
 
-# သင်၏ Telegram Bot အချက်အလက်များ
 TELEGRAM_BOT_TOKEN = "9137803689:AAGYQD_F7IfK2Q6KKptNU3UWW7DpCA65RL4"
 CHAT_ID = "6130147402" 
 
@@ -19,10 +18,10 @@ def run_scanner():
     print("🚀 GitHub Actions: Ruijie Safe & Fast Voucher Scanner Started")
     send_telegram_msg("🚀 <b>GitHub Actions Bot:</b> စကန်ဖတ်ခြင်း စတင်ပါပြီ။")
     
-    # ⚠️ အောက်ပါ 'http://YOUR_PORTAL_URL_HERE/portal' နေရာတွင် သင်စကန်ဖတ်မည့် Ruijie Portal URL အမှန်ကို ထည့်ပါ
-    portal_url = "http://YOUR_PORTAL_URL_HERE/portal"  
-    prefix = "2"    # စတင်မည့် အစဂဏန်း
-    length = 6      # ကုဒ်အရှည်
+    # GitHub Secret သို့မဟုတ် Environment Variable မှ Portal URL ကို ယူမည် (မရှိပါက Default သုံးမည်)
+    portal_url = os.environ.get("PORTAL_URL", "http://YOUR_DEFAULT_PORTAL/portal")
+    prefix = "2"
+    length = 6
     pool = "0123456789"
 
     total_checked = 0
@@ -48,7 +47,6 @@ def run_scanner():
             time.sleep(0.5)
             continue
 
-        # IP Ban မခံရအောင် Delay ခဏပေးခြင်း (0.15 စက္ကန့်)
         time.sleep(0.15)
 
         if total_checked % 50 == 0:
