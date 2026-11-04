@@ -5,7 +5,7 @@ TOKEN = "9137803689:AAGYQD_F7IfK2Q6KKptNU3UWW7DpCA65RL4"
 bot = telebot.TeleBot(TOKEN)
 
 # သင့်ရဲ့ GitHub အချက်အလက်များကို ဒီမှာ ထည့်ပါ
-GH_TOKEN = "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"
+GH_TOKEN = "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"
 GH_REPO = "thetwaioo-byte/ruijie-scanner"  # သင့် GitHub Username နှင့် Repository နာမည်
 
 current_portal = "http://ยังမထည့်ရသေးပါ/portal"
